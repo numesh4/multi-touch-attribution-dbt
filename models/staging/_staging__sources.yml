@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: ga4
+    schema: raw_ga4
+    description: "Website event export, standing in for a GA4/Segment integration"
+    tables:
+      - name: events
+        description: "Raw marketing touchpoint events, one row per interaction"
+
+  - name: shopify
+    schema: raw_shopify
+    description: "Orders export, standing in for a Shopify/CRM integration"
+    tables:
+      - name: orders
+        description: "Raw conversion/order events, one row per purchase"
+      - name: customers
+        description: "Customer records with B2B/B2C segment flag"
+
+  - name: google_ads
+    schema: raw_google_ads
+    description: "Ad platform cost export, standing in for a Google Ads API integration"
+    tables:
+      - name: campaign_costs
+        description: "Daily paid_search spend, cost reported in micros"
+
+  - name: meta_ads
+    schema: raw_meta_ads
+    description: "Ad platform performance export, standing in for a Meta Ads API integration"
+    tables:
+      - name: ad_insights
+        description: "Daily campaign-level spend, impressions, and clicks for paid_social"
