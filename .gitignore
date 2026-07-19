@@ -1,0 +1,7 @@
+target/
+dbt_packages/
+logs/
+dev.duckdb
+.env
+venv/
+dbt_internal_packages/
