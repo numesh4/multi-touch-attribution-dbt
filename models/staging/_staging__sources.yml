@@ -5,14 +5,14 @@ sources:
     schema: raw_ga4
     description: "Website event export, standing in for a GA4/Segment integration"
     tables:
-      - name: events
+      - name: ga4events
         description: "Raw marketing touchpoint events, one row per interaction"
 
   - name: shopify
     schema: raw_shopify
     description: "Orders export, standing in for a Shopify/CRM integration"
     tables:
-      - name: orders
+      - name: shopify_orders
         description: "Raw conversion/order events, one row per purchase"
       - name: customers
         description: "Customer records with B2B/B2C segment flag"
@@ -21,12 +21,33 @@ sources:
     schema: raw_google_ads
     description: "Ad platform cost export, standing in for a Google Ads API integration"
     tables:
-      - name: campaign_costs
+      - name: google_campaign_costs
         description: "Daily paid_search spend, cost reported in micros"
 
   - name: meta_ads
     schema: raw_meta_ads
     description: "Ad platform performance export, standing in for a Meta Ads API integration"
     tables:
-      - name: ad_insights
+      - name: meta_ad_insights
         description: "Daily campaign-level spend, impressions, and clicks for paid_social"
+ 
+  - name: meta_pixel
+    schema: raw_meta_pixel
+    description: "Meta Pixel / Conversions API export, standing in for on-site social ad tracking"
+    tables:
+      - name: meta_pixel_events
+        description: "Raw paid_social touchpoint events, keyed by fb_external_id"
+
+  - name: callrail
+    schema: raw_callrail
+    description: "Call tracking export, standing in for a CallRail-style integration"
+    tables:
+      - name: calls
+        description: "Inbound phone touchpoints, matched by caller_phone_number, not a customer ID"
+
+  - name: helpdesk
+    schema: raw_helpdesk
+    description: "Support inbox export, standing in for a Zendesk/Freshdesk-style integration"
+    tables:
+      - name: inbound_helpdesk_emails
+        description: "Inbound email touchpoints, matched by from_email, not a customer ID"

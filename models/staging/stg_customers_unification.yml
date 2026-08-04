@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: stg_customers_unification
+    description: |
+      Customer identity unification model. This view consolidates known Shopify customers with
+      event-derived identities from GA4, Meta Pixel, CallRail, and Helpdesk. It preserves unknown
+      identities until they can be matched to a known customer, and records the match method and
+      merge reason.
+    columns:
+      - name: customer_profile_id
+        description: "Stable profile identifier for the unified identity record. Uses the known customer_id when available; otherwise derives a source-specific unknown identity key."
+        tests:
+          - not_null
+          - unique
+      - name: known_customer_id
+        description: "The Shopify customer_id when the identity could be linked to a known customer. Null for unmatched identities."
+      - name: normalized_email
+        description: "Normalized email address used for identity matching where available."
+      - name: normalized_phone
+        description: "Normalized phone number used for identity matching where available."
+      - name: customer_type
+        description: "Customer type from Shopify when available (b2c/b2b)."
+      - name: source_system
+        description: "The raw source system that supplied this identity row."
+        tests:
+          - not_null
+      - name: source_id
+        description: "The source key from the raw system, such as a platform event id, phone number, or email identifier."
+      - name: source_timestamp
+        description: "The earliest observed timestamp for this identity in the source system."
+        tests:
+          - not_null
+      - name: match_method
+        description: "How this identity row was matched to a known customer, or 'unknown' if unmatched."
+      - name: is_known_customer
+        description: "True when this identity row resolves to a known Shopify customer."
+      - name: merge_reason
+        description: "The reason for the identity merge/match."
