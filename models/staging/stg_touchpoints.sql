@@ -2,54 +2,79 @@
 
 with ga4 as (
     select
-        concat('ga4|', cast(event_id as text)) as platform_id,
-        ga_user_id as user_id,
-        traffic_source as channel,
-        campaign_name as campaign,
-        cast(event_timestamp as timestamp) as event_timestamp,
+        concat('ga4|', cast(e.event_id as text)) as platform_id,
+        -- look up a known customer mapping if one exists in the unification model
+        (select known_customer_id from {{ ref('stg_customers_unification') }} cu
+            where cu.source_system = 'raw_ga4.ga4events' and cu.source_id = lower(trim(e.ga_user_id::text))
+            limit 1) as resolved_known_customer_id,
+        (select customer_profile_id from {{ ref('stg_customers_unification') }} cu
+            where cu.source_system = 'raw_ga4.ga4events' and cu.source_id = lower(trim(e.ga_user_id::text))
+            limit 1) as resolved_customer_profile_id,
+        (select match_method from {{ ref('stg_customers_unification') }} cu
+            where cu.source_system = 'raw_ga4.ga4events' and cu.source_id = lower(trim(e.ga_user_id::text))
+            limit 1) as match_method,
+        e.traffic_source as channel,
+        e.campaign_name as campaign,
+        cast(e.event_timestamp as timestamp) as event_timestamp,
         'raw_ga4.ga4events' as raw_source,
-        null as raw_identifier
-    from {{ source('ga4', 'ga4events') }}
+        e.ga_user_id as raw_identifier
+    from {{ source('ga4', 'ga4events') }} as e
 ),
 
 meta_pixel as (
     select
         concat('meta_pixel|', cast(pixel_event_id as text)) as platform_id,
-        fb_external_id as user_id,
+        -- attempt to resolve known customer via customer_profile source mapping
+        (select known_customer_id from {{ ref('stg_customers_unification') }} cu
+            where cu.source_system = 'raw_meta_pixel.meta_pixel_events'
+              and cu.source_id = lower(trim(m.pixel_event_id::text))
+            limit 1) as resolved_known_customer_id,
+        (select customer_profile_id from {{ ref('stg_customers_unification') }} cu
+            where cu.source_system = 'raw_meta_pixel.meta_pixel_events'
+              and cu.source_id = lower(trim(m.pixel_event_id::text))
+            limit 1) as resolved_customer_profile_id,
+        (select match_method from {{ ref('stg_customers_unification') }} cu
+            where cu.source_system = 'raw_meta_pixel.meta_pixel_events'
+              and cu.source_id = lower(trim(m.pixel_event_id::text))
+            limit 1) as match_method,
         'paid_social' as channel,
         campaign_name as campaign,
         cast(event_time as timestamp) as event_timestamp,
         'raw_meta_pixel.meta_pixel_events' as raw_source,
         null as raw_identifier
-    from {{ source('meta_pixel', 'meta_pixel_events') }}
+    from {{ source('meta_pixel', 'meta_pixel_events') }} as m
 ),
 
 callrail as (
     select
-        concat('callrail|', cast(call_id as text)) as platform_id,
-        cust.customer_id as user_id,
+        concat('callrail|', cast(c.call_id as text)) as platform_id,
+        custu.known_customer_id as resolved_known_customer_id,
+        custu.customer_profile_id as resolved_customer_profile_id,
+        custu.match_method as match_method,
         'phone' as channel,
-        source_campaign as campaign,
-        cast(call_datetime as timestamp) as event_timestamp,
+        c.source_campaign as campaign,
+        cast(c.call_datetime as timestamp) as event_timestamp,
         'raw_callrail.calls' as raw_source,
-        caller_phone_number as raw_identifier
+        c.caller_phone_number as raw_identifier
     from {{ source('callrail', 'calls') }} as c
-    left join {{ source('shopify', 'customers') }} as cust
-      on c.caller_phone_number = cust.phone_number
+    left join {{ ref('stg_customers_unification') }} as custu
+      on regexp_replace(c.caller_phone_number, '[^0-9]', '') = custu.normalized_phone
 ),
 
 helpdesk as (
     select
-        concat('helpdesk|', cast(ticket_id as text)) as platform_id,
-        cust.customer_id as user_id,
+        concat('helpdesk|', cast(h.ticket_id as text)) as platform_id,
+        custu.known_customer_id as resolved_known_customer_id,
+        custu.customer_profile_id as resolved_customer_profile_id,
+        custu.match_method as match_method,
         'email_inbound' as channel,
-        subject_category as campaign,
-        cast(received_at as timestamp) as event_timestamp,
+        h.subject_category as campaign,
+        cast(h.received_at as timestamp) as event_timestamp,
         'raw_helpdesk.inbound_helpdesk_emails' as raw_source,
-        lower(from_email) as raw_identifier
+        lower(h.from_email) as raw_identifier
     from {{ source('helpdesk', 'inbound_helpdesk_emails') }} as h
-    left join {{ source('shopify', 'customers') }} as cust
-      on lower(h.from_email) = lower(cust.email)
+    left join {{ ref('stg_customers_unification') }} as custu
+      on lower(h.from_email) = custu.normalized_email
 )
 
 select * from ga4

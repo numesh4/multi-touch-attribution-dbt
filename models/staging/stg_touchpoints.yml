@@ -4,16 +4,20 @@ models:
   - name: stg_touchpoints
     description: |
       Unified staging model for touchpoints. Normalizes raw GA4, Meta Pixel, CallRail, and Helpdesk
-      feeds into a canonical touchpoint schema and attempts to resolve phone/email activity to a
-      customer_id when a matching Shopify customer exists.
+      feeds into a canonical touchpoint schema and attempts to resolve identities using the
+      `stg_customers_unification` model where possible.
     columns:
       - name: platform_id
-        description: "Original platform event ID or row ID, cast to text for union compatibility."
+        description: "Original platform event ID or row ID, prefixed with source to be globally unique."
         tests:
           - not_null
           - unique
-      - name: user_id
-        description: "Resolved customer_id from the raw source where available; null if no match exists."
+      - name: resolved_known_customer_id
+        description: "Known Shopify customer_id when the touchpoint could be resolved via the unification model."
+      - name: resolved_customer_profile_id
+        description: "Customer profile id (unified identity) when available from stg_customers_unification."
+      - name: match_method
+        description: "Method used to resolve the identity (customer_id_match, email_match, phone_match, unknown)."
       - name: channel
         description: "Canonical touchpoint channel category (paid_search, paid_social, email, organic, phone, email_inbound)."
         tests:

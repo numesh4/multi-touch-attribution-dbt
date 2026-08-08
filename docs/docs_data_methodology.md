@@ -1,5 +1,7 @@
 # Data Methodology and Realism Notes
 
+Current project stage: staging and customer unification models are built and validated, and the next phase is intermediate journey modeling and attribution marts.
+
 This document explains the design decisions behind the synthetic dataset used in this project, why it was built the way it was, and the known limitations of the approach. It's intended to sit alongside the technical models as a plain-language reference, the kind of document a stakeholder or interviewer could read without needing to open any SQL.
 
 ---

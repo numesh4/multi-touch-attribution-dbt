@@ -5,15 +5,21 @@ A hands-on dbt project for multi-touch attribution (first-touch, last-touch, lin
 ---
 
 ## Quick links
-- Project root: `C:/Users/nikas/OneDrive/Documents/GitHub/multi-touch-attribution-dbt`
-- Sources YAML: [models/staging/_staging__sources.yml](C:/Users/nikas/OneDrive/Documents/GitHub/multi-touch-attribution-dbt/models/staging/_staging__sources.yml)
-- Data generators: [generate_synthetic_data.py](C:/Users/nikas/OneDrive/Documents/GitHub/multi-touch-attribution-dbt/generate_synthetic_data.py), [build_source_data.py](C:/Users/nikas/OneDrive/Documents/GitHub/multi-touch-attribution-dbt/build_source_data.py)
-- Docs: [docs/docs_data_methodology.md](C:/Users/nikas/OneDrive/Documents/GitHub/multi-touch-attribution-dbt/docs/docs_data_methodology.md)
+- Project root: `.`
+- Sources YAML: [models/staging/_staging__sources.yml](models/staging/_staging__sources.yml)
+- Data generators: [generate_synthetic_data.py](generate_synthetic_data.py), [build_source_data.py](build_source_data.py)
+- Docs: [docs/docs_data_methodology.md](docs/docs_data_methodology.md)
 
 ---
 
 ## One-line summary
 Build and compare multiple multi-touch attribution methods with synthetic data and dbt. Use this repo as a portfolio piece or a sandbox for attribution experiments.
+
+---
+
+## Current project stage
+- Staging models `stg_customers_unification`, `stg_touchpoints`, and `stg_conversions` are built and validated.
+- The next phase is intermediate journey modeling and attribution marts.
 
 ---
 
@@ -45,6 +51,13 @@ Build and compare multiple multi-touch attribution methods with synthetic data a
    dbt docs serve
    ```
 
+   If you want to validate only the current staging models:
+
+   ```bash
+   dbt run --select stg_customers_unification stg_touchpoints stg_conversions
+   dbt test --select stg_customers_unification stg_touchpoints stg_conversions
+   ```
+
 Tips:
 - If you use the DuckDB route, ensure your dbt profile points to `dev.duckdb` or your adapter of choice.
 - `build_source_data.py` creates multiple realistic raw schemas (raw_ga4, raw_meta_pixel, raw_callrail, raw_helpdesk, raw_shopify, raw_google_ads, raw_meta_ads).
@@ -54,24 +67,24 @@ Tips:
 ## Project layout (short)
 - dbt_project.yml — project config
 - models/
-  - staging/ — source YAMLs live here; staging SQL models to add (stg_*)
+  - staging/ — source YAMLs and staging SQL models for raw source normalization (stg_*)
   - intermediate/ — journey stitching (int_*)
   - marts/ — attribution marts (fct_*)
 - macros/ — reusable SQL macros (add time-decay macro here)
 - seeds/ — (optional) CSV seeds produced by generator
 - docs/ — methodology and ERD
 
-See [dbt_project.yml](C:/Users/nikas/OneDrive/Documents/GitHub/multi-touch-attribution-dbt/dbt_project.yml) for materialization defaults.
+See [dbt_project.yml](dbt_project.yml) for materialization defaults.
 
 ---
 
 ## Recommended next steps (prioritized)
-1. Add staging models and corresponding YAML/tests:
-   - `models/staging/stg_touchpoints.sql` (+ YAML with column tests)
-   - `models/staging/stg_conversions.sql`
-   - `models/staging/stg_costs.sql` (normalize google/meta cost formats)
-2. Add intermediate model: `models/intermediate/int_user_journeys.sql` (stitch touchpoints to conversions).
-3. Implement marts (`models/marts/attribution/`): first/last/linear/time-decay + a summary mart for comparisons.
+1. Build and validate the intermediate journey model:
+   - `models/intermediate/int_user_journeys.sql` (stitch touchpoints to conversions)
+   - `models/intermediate/int_user_journeys.yml` (tests and documentation)
+2. Add staging normalization for cost data:
+   - `models/staging/stg_costs.sql` to normalize Google Ads / Meta Ads spend and convert units to standard currency.
+3. Implement attribution marts (`models/marts/attribution/`): first-touch, last-touch, linear, time-decay, and a summary comparison mart.
 4. Add `macros/time_decay_weight.sql` to centralize decay logic and make models DRY.
 5. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
 

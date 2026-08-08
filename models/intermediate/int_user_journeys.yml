@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: int_user_journeys
+    description: |
+      Intermediate model that orders touchpoints per user and links each user journey to the first
+      conversion, where present. This creates a canonical journey-level input for downstream attribution marts.
+    columns:
+      - name: user_id
+        description: "Customer identifier for the journey."
+        tests:
+          - not_null
+      - name: platform_id
+        description: "Platform-specific identifier for the touchpoint."
+        tests:
+          - not_null
+      - name: channel
+        description: "Canonical marketing channel for the touchpoint."
+        tests:
+          - not_null
+      - name: event_timestamp
+        description: "Timestamp of the touchpoint."
+        tests:
+          - not_null
+      - name: touch_sequence
+        description: "Ordered position of the touchpoint within the user's journey."
+        tests:
+          - not_null
+      - name: is_before_conversion
+        description: "Flag indicating whether the touchpoint occurred before the linked conversion."
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]

@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: stg_conversions
+    description: |
+      Staging model that normalizes Shopify orders into a canonical conversions table used by downstream
+      attribution and LTV models.
+    columns:
+      - name: order_id
+        description: "Order identifier (string)"
+        tests:
+          - not_null
+          - unique
+      - name: user_id
+        description: "Customer id associated with the order"
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers_unification')
+                field: known_customer_id
+      - name: conversion_timestamp
+        description: "Order creation timestamp"
+        tests:
+          - not_null
+      - name: revenue
+        description: "Order revenue / total_price"
+        tests:
+          - not_null
+      - name: customer_email
+        description: "Customer email where available (from customers source)"
+      - name: customer_phone
+        description: "Customer phone number where available (from customers source)"
+      - name: raw_source
+        description: "Source table for this row"
+      - name: customer_profile_id
+        description: "Customer profile id from stg_customers_unification when available."
+      - name: match_method
+        description: "How the conversion/customer linkage was resolved (from unification model)."
