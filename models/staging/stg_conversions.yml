@@ -37,3 +37,7 @@ models:
         description: "Customer profile id from stg_customers_unification when available."
       - name: match_method
         description: "How the conversion/customer linkage was resolved (from unification model)."
+      - name: is_repeat_purchase
+        description: "True if this is not the customer's earliest order by conversion_timestamp, false if it is their first."
+        tests:
+          - not_null
