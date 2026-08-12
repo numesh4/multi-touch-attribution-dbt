@@ -78,7 +78,7 @@ Six distinct journey types were generated deliberately, so the attribution model
 
 **Inconsistent column naming across sources, by design.** Forces genuine staging-layer normalization rather than a rename-only passthrough.
 
-**Cost data reported in micros.** Google Ads' API reports spend in micros (millionths of a currency unit), a real quirk of that platform's data format. The staging model has to correctly convert units, a small but realistic detail a generic tutorial dataset wouldn't include.
+**Cost data reported in micros.** Google Ads' API reports spend in micros (millionths of a currency unit), a real quirk of that platform's data format. The staging model has to correctly convert units, a small but realistic detail a generic dataset wouldn't include.
 
 **Six distinct journey scenarios**, rather than uniform "some touches then a conversion" journeys, as detailed above.
 

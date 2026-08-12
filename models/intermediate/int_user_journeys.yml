@@ -2,33 +2,131 @@ version: 2
 
 models:
   - name: int_user_journeys
-    description: |
-      Intermediate model that orders touchpoints per user and links each user journey to the first
-      conversion, where present. This creates a canonical journey-level input for downstream attribution marts.
+    description: Customer journeys linking touchpoints to orders (converting) or marking non-converting paths.
+    # Grain is one row per touchpoint within a journey, not one row per journey,
+    # so journey_id repeats across every touchpoint in a multi-touch journey.
+    # The real uniqueness key is (journey_id, platform_id).
+    data_tests:
+      - unique:
+          column_name: "journey_id || '::' || platform_id"
+
     columns:
-      - name: user_id
-        description: "Customer identifier for the journey."
-        tests:
+      - name: journey_id
+        description: Order_id for converting journeys, or profile_id + '_no_conversion' for non-converting.
+        data_tests:
           - not_null
+
+      - name: shopify_customer_id
+        description: Shopify customer_id if this journey represents an order. Null for non-converting.
+
+      - name: journey_end_date
+        description: Order_date for converting journeys, latest touch timestamp for non-converting.
+        data_tests:
+          - not_null
+
       - name: platform_id
-        description: "Platform-specific identifier for the touchpoint."
-        tests:
+        description: Unique touchpoint identifier within source system (e.g., 'ga4|event_123').
+        data_tests:
           - not_null
+
+      - name: resolved_known_customer_id
+        description: Shopify customer_id if touchpoint resolved to a known customer. Null if unknown.
+
+      - name: resolved_customer_profile_id
+        description: Unified customer profile ID (from stg_customers_unification). Used to join customer attributes.
+        data_tests:
+          - not_null
+
+      - name: touchpoint_match_method
+        description: How touchpoint was matched to customer (customer_id_match, phone_match, email_match, unknown) or default to the customer table.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['customer_id_match', 'phone_match', 'email_match', 'unknown','customer_table']
+
+      - name: customer_type
+        description: B2B or B2C. Null for unknown visitors.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['b2b', 'b2c']
+
+      - name: profile_source_system
+        description: Source system where profile originated (raw_shopify.customers, raw_ga4.ga4events, etc.).
+
       - name: channel
-        description: "Canonical marketing channel for the touchpoint."
-        tests:
+        description: Marketing channel (paid_search, paid_social, organic, email, phone, email_inbound).
+        data_tests:
           - not_null
+          - accepted_values:
+              arguments:
+                values: ['paid_search', 'paid_social', 'organic', 'email', 'phone', 'email_inbound']
+
+      - name: campaign
+        description: Campaign name or identifier within the channel.
+        data_tests:
+          - not_null
+
       - name: event_timestamp
-        description: "Timestamp of the touchpoint."
-        tests:
+        description: When the touchpoint occurred.
+        data_tests:
           - not_null
-      - name: touch_sequence
-        description: "Ordered position of the touchpoint within the user's journey."
-        tests:
+
+      - name: raw_source
+        description: Raw source table (raw_ga4.ga4events, raw_callrail.calls, etc.). Audit trail only.
+
+      - name: raw_identifier
+        description: Unresolved identifier from source (ga_user_id, caller_phone_number, from_email, etc.). Audit trail only.
+
+      - name: converted
+        description: 1 if converting journey, 0 if non-converting.
+        data_tests:
           - not_null
-      - name: is_before_conversion
-        description: "Flag indicating whether the touchpoint occurred before the linked conversion."
-        tests:
           - accepted_values:
               arguments:
                 values: [0, 1]
+
+      - name: order_value
+        description: Order revenue for converting journeys. Null for non-converting.
+
+      - name: is_repeat_purchase
+        description: True if repeat customer order, false if first purchase. Null for non-converting.
+
+      - name: touchpoint_sequence
+        description: Ordinal position in journey (1 = first touch, 2 = second, etc.).
+        data_tests:
+          - not_null
+
+      - name: previous_touch_timestamp
+        description: Timestamp of previous touchpoint. Null if first touch.
+
+      - name: next_touch_timestamp
+        description: Timestamp of next touchpoint. Null if last touch.
+
+      - name: days_to_conversion
+        description: Days from this touch to journey end. 0 if touch on order date.
+        data_tests:
+          - not_null
+
+      - name: total_touches_in_journey
+        description: Total touchpoints in this journey.
+        data_tests:
+          - not_null
+
+      - name: seconds_since_previous_touch
+        description: Seconds from previous touch to this touch. Null if first touch.
+
+      - name: is_first_touch
+        description: True if first touchpoint in journey.
+        data_tests:
+          - not_null
+
+      - name: is_last_touch
+        description: True if last touchpoint in journey.
+        data_tests:
+          - not_null
+
+      - name: is_single_touch_journey
+        description: True if journey has exactly one touchpoint.
+        data_tests:
+          - not_null
