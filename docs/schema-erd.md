@@ -1,17 +1,22 @@
 # Source schema
 
-Entity relationship diagram of the five raw source tables and how they connect.
+Entity relationship diagram of the eight raw source tables and how they connect.
 
 ```mermaid
 erDiagram
   CUSTOMERS ||--o{ ORDERS : "places"
-  CUSTOMERS ||--o{ EVENTS : "generates"
-  EVENTS }o--o{ GOOGLE_ADS_COSTS : "joins_on_channel_date"
-  EVENTS }o--o{ META_ADS_COSTS : "joins_on_channel_date"
+  CUSTOMERS ||--o{ GA4_EVENTS : "customer_id match"
+  CUSTOMERS ||--o{ META_PIXEL_EVENTS : "customer_id match"
+  CUSTOMERS |o--o{ CALLS : "phone number match, not a shared key"
+  CUSTOMERS |o--o{ HELPDESK_EMAILS : "email match, not a shared key"
+  GA4_EVENTS }o--o{ GOOGLE_ADS_COSTS : "joins_on_channel_date (planned: stg_costs)"
+  META_PIXEL_EVENTS }o--o{ META_ADS_COSTS : "joins_on_channel_date (planned: stg_costs)"
   CUSTOMERS {
     string customer_id PK
     string customer_type
     date first_seen_date
+    string phone_number
+    string email
   }
   ORDERS {
     string order_id PK
@@ -19,12 +24,33 @@ erDiagram
     timestamp created_at
     float total_price
   }
-  EVENTS {
+  GA4_EVENTS {
     string event_id PK
     string ga_user_id FK
     string traffic_source
     string campaign_name
     timestamp event_timestamp
+  }
+  META_PIXEL_EVENTS {
+    string pixel_event_id PK
+    string fb_external_id FK
+    string campaign_name
+    timestamp event_time
+  }
+  CALLS {
+    string call_id PK
+    string tracking_phone_number
+    string caller_phone_number
+    timestamp call_datetime
+    int duration_seconds
+    string direction
+    string source_campaign
+  }
+  HELPDESK_EMAILS {
+    string ticket_id PK
+    string from_email
+    timestamp received_at
+    string subject_category
   }
   GOOGLE_ADS_COSTS {
     date cost_date
@@ -40,37 +66,42 @@ erDiagram
   }
 ```
 
-**Note on the cost tables:** `google_ads_costs` and `meta_ads_costs` don't share a customer or event key with anything else, they're daily aggregates. They join to `events` on `channel` + `date` instead, a many-to-many relationship, not a true foreign key. This is why `stg_costs` has to explicitly union and normalize both tables before "cost" becomes one consistent concept downstream.
+**Note on identity matching:** `GA4_EVENTS` and `META_PIXEL_EVENTS` carry a customer ID directly (`ga_user_id`, `fb_external_id`), so they resolve to `CUSTOMERS` with a clean, if loosely-typed, key match. `CALLS` and `HELPDESK_EMAILS` carry no customer ID at all, they're matched to `CUSTOMERS` by a digit-normalized phone number or a lowercased/trimmed email address instead, a genuinely weaker join than a foreign key. `stg_customers_unification` is where all four of these matching strategies actually get implemented and reconciled into one `customer_profile_id`.
+
+**Note on the cost tables:** `google_ads_costs` and `meta_ads_costs` don't share a customer or event key with anything else, they're daily aggregates. They're intended to join to touchpoints on `channel` + `date`, a many-to-many relationship, not a true foreign key, once a `stg_costs` staging model normalizes both tables into one consistent "cost" concept. That model doesn't exist yet; see the layered view below.
 
 ---
 
 ## Layered schema view (raw → staging → intermediate → marts)
 
-The diagram below shows the intended raw/staging/intermediate/mart architecture: how raw source tables (in DuckDB or a data warehouse) flow into per-source staging models, a canonical staging union (`stg_touchpoints`), intermediate journey stitching, and final attribution marts. Use this as a guide when organizing models and tests at each layer.
+The diagram below shows the raw/staging/intermediate/mart architecture: how raw source tables (in DuckDB, standing in for a data warehouse) flow into per-concern staging models, an intermediate journey model, and the (still-planned) attribution marts. Use this as a guide when organizing models and tests at each layer.
 
 ```mermaid
 flowchart LR
   subgraph Raw["Raw — DuckDB / source layer"]
     raw_ga4[raw_ga4.ga4events]
-    raw_meta[raw_meta_pixel.meta_pixel_events]
+    raw_meta_pixel[raw_meta_pixel.meta_pixel_events]
     raw_callrail[raw_callrail.calls]
     raw_helpdesk[raw_helpdesk.inbound_helpdesk_emails]
-    raw_shopify_orders[raw_shopify.shopify_orders]
     raw_shopify_customers[raw_shopify.customers]
+    raw_shopify_orders[raw_shopify.shopify_orders]
     raw_google[raw_google_ads.google_campaign_costs]
     raw_meta_ads[raw_meta_ads.meta_ad_insights]
   end
 
   subgraph Staging["Staging (dbt models)"]
+    stg_customers[stg_customers_unification]
     stg_touchpoints[stg_touchpoints]
+    stg_conversions[stg_conversions]
+    stg_costs["stg_costs (planned)"]
   end
 
-  subgraph Intermediate["Intermediate / planned models"]
+  subgraph Intermediate["Intermediate"]
     int_journeys[int_user_journeys]
-    int_sessions[int_user_sessions]
+    int_sessions["int_user_sessions (planned)"]
   end
 
-  subgraph Marts["Marts / planned models"]
+  subgraph Marts["Marts (planned)"]
     fct_first[fct_attribution_first_touch]
     fct_last[fct_attribution_last_touch]
     fct_linear[fct_attribution_linear]
@@ -79,22 +110,42 @@ flowchart LR
     fct_incrementality[fct_incrementality_vs_attribution]
   end
 
-  %% Raw source tables -> canonical staging
+  %% Raw source tables -> stg_customers_unification (identity resolution)
+  raw_shopify_customers --> stg_customers
+  raw_ga4 --> stg_customers
+  raw_meta_pixel --> stg_customers
+  raw_callrail --> stg_customers
+  raw_helpdesk --> stg_customers
+
+  %% Raw touchpoint tables + identity resolution -> stg_touchpoints
   raw_ga4 --> stg_touchpoints
-  raw_meta --> stg_touchpoints
+  raw_meta_pixel --> stg_touchpoints
   raw_callrail --> stg_touchpoints
   raw_helpdesk --> stg_touchpoints
-  raw_shopify_customers --> stg_touchpoints
+  stg_customers --> stg_touchpoints
 
-  %% Canonical staging -> intermediate -> marts
+  %% Raw order/customer tables + identity resolution -> stg_conversions
+  raw_shopify_orders --> stg_conversions
+  raw_shopify_customers --> stg_conversions
+  stg_customers --> stg_conversions
+
+  %% Raw cost tables -> stg_costs (planned)
+  raw_google --> stg_costs
+  raw_meta_ads --> stg_costs
+
+  %% Staging -> intermediate
   stg_touchpoints --> int_journeys
+  stg_conversions --> int_journeys
+  stg_customers --> int_journeys
   stg_touchpoints --> int_sessions
 
+  %% Intermediate + costs -> marts
   int_journeys --> fct_first
   int_journeys --> fct_last
   int_journeys --> fct_linear
   int_journeys --> fct_time_decay
   int_journeys --> fct_incrementality
+  stg_costs --> fct_summary
 
   fct_first --> fct_summary
   fct_last --> fct_summary
@@ -103,9 +154,9 @@ flowchart LR
 ```
 
 Notes:
-- Raw: physical tables/files that arrive from source systems (DuckDB in dev, Snowflake/BigQuery in production). The current raw tables include the GA4, Meta Pixel, CallRail, Helpdesk, Shopify customer/order, and cost tables.
-- Staging: your current dbt model in this repo is `stg_touchpoints`, which unifies the raw source tables used by the current project into one canonical touchpoint schema. The current implementation pulls from `raw_ga4.ga4events`, `raw_meta_pixel.meta_pixel_events`, `raw_callrail.calls`, `raw_helpdesk.inbound_helpdesk_emails`, and `raw_shopify.customers`.
-- Intermediate: planned models such as `int_user_journeys` and `int_user_sessions` would sit here once implemented.
-- Marts: planned attribution models such as `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, `fct_attribution_time_decay`, `fct_attribution_summary`, and `fct_incrementality_vs_attribution` would sit here once implemented.
+- Raw: physical tables loaded directly into DuckDB by `build_source_data.py` (standing in for Snowflake/BigQuery in production), bypassing `dbt seed` entirely, the same way an EL tool would land them. Eight tables across seven schemas: `raw_ga4.ga4events`, `raw_meta_pixel.meta_pixel_events`, `raw_callrail.calls`, `raw_helpdesk.inbound_helpdesk_emails`, `raw_shopify.customers`, `raw_shopify.shopify_orders`, `raw_google_ads.google_campaign_costs`, `raw_meta_ads.meta_ad_insights`.
+- Staging: three models are built and validated today. `stg_customers_unification` resolves the four touchpoint sources and the orders source against `raw_shopify.customers` into one `customer_profile_id` per person (see `docs/docs_data_methodology.md` for the matching logic). `stg_touchpoints` unions the four touchpoint sources into one canonical touchpoint schema, resolved against `stg_customers_unification`. `stg_conversions` normalizes `raw_shopify.shopify_orders` into a canonical conversions table, also resolved against `stg_customers_unification`. `stg_costs`, which would normalize the two cost sources (including the Google Ads micros conversion) into one canonical cost concept, is planned but not yet built.
+- Intermediate: `int_user_journeys` is built, it stitches every touchpoint before an order into a converting journey, and groups touchpoints from non-converting profiles into a non-converting journey, with ordinal position, time-since-previous-touch, and first/last-touch flags computed per touch. `int_user_sessions` is planned but not yet built.
+- Marts: no attribution marts are built yet. Planned models: `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, `fct_attribution_time_decay`, `fct_attribution_summary`, and `fct_incrementality_vs_attribution`.
 
-This layered view makes it clear where to place tests and transformations: schema tests on `stg_touchpoints` today, and business-rule tests on intermediate/mart models as those layers are built.
+This layered view makes it clear where to place tests and transformations: schema and relationship tests on the staging layer today (already in place for `stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, and `int_user_journeys`), and business-rule tests on the mart layer as it gets built.

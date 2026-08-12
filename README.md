@@ -7,38 +7,35 @@ A hands-on dbt project for multi-touch attribution (first-touch, last-touch, lin
 ## Quick links
 - Project root: `.`
 - Sources YAML: [models/staging/_staging__sources.yml](models/staging/_staging__sources.yml)
-- Data generators: [generate_synthetic_data.py](generate_synthetic_data.py), [build_source_data.py](build_source_data.py)
+- Data generator: [build_source_data.py](build_source_data.py) (the older `generate_synthetic_data.py` is deprecated, kept as `generate_synthetic_data(deprecated).py`)
 - Docs: [docs/docs_data_methodology.md](docs/docs_data_methodology.md)
 
 ---
 
 ## One-line summary
-Build and compare multiple multi-touch attribution methods with synthetic data and dbt. Use this repo as a portfolio piece or a sandbox for attribution experiments.
+Build and compare multiple multi-touch attribution methods with synthetic data and dbt. Use this repo as a sandbox for attribution experiments.
 
 ---
 
 ## Current project stage
 - Staging models `stg_customers_unification`, `stg_touchpoints`, and `stg_conversions` are built and validated.
-- The next phase is intermediate journey modeling and attribution marts.
+- The intermediate journey model `int_user_journeys` (stitching touchpoints to conversions) is built.
+- The next phase is cost-data staging (`stg_costs`) and the attribution marts.
 
 ---
 
 ## Getting started (super quick)
 1. Ensure you have Python 3.10+ and dbt installed (DuckDB adapter recommended for local dev).
 
-2a. Generate CSV seeds (simple):
-
-   ```bash
-   python generate_synthetic_data.py
-   # writes: ./seeds/raw_touchpoints.csv, ./seeds/raw_conversions.csv, ./seeds/raw_costs.csv
-   ```
-
-2b. (Optional) Load richer test data directly into DuckDB:
+2. Load the synthetic source data directly into DuckDB:
 
    ```bash
    python build_source_data.py
-   # writes into dev.duckdb with multiple raw_* schemas
+   # requires dev.duckdb to already exist (run `dbt debug` at least once first)
+   # writes into dev.duckdb across seven raw_* schemas
    ```
+
+   (An older CSV-seed generator, `generate_synthetic_data(deprecated).py`, is kept for reference but no longer matches the current source schemas — use `build_source_data.py`.)
 
 3. Run dbt (example flow):
 
@@ -51,11 +48,11 @@ Build and compare multiple multi-touch attribution methods with synthetic data a
    dbt docs serve
    ```
 
-   If you want to validate only the current staging models:
+   If you want to validate only the currently built models:
 
    ```bash
-   dbt run --select stg_customers_unification stg_touchpoints stg_conversions
-   dbt test --select stg_customers_unification stg_touchpoints stg_conversions
+   dbt run --select stg_customers_unification stg_touchpoints stg_conversions int_user_journeys
+   dbt test --select stg_customers_unification stg_touchpoints stg_conversions int_user_journeys
    ```
 
 Tips:
@@ -79,13 +76,11 @@ See [dbt_project.yml](dbt_project.yml) for materialization defaults.
 ---
 
 ## Recommended next steps (prioritized)
-1. Build and validate the intermediate journey model:
-   - `models/intermediate/int_user_journeys.sql` (stitch touchpoints to conversions)
-   - `models/intermediate/int_user_journeys.yml` (tests and documentation)
-2. Add staging normalization for cost data:
+1. Add staging normalization for cost data:
    - `models/staging/stg_costs.sql` to normalize Google Ads / Meta Ads spend and convert units to standard currency.
-3. Implement attribution marts (`models/marts/attribution/`): first-touch, last-touch, linear, time-decay, and a summary comparison mart.
-4. Add `macros/time_decay_weight.sql` to centralize decay logic and make models DRY.
+2. Implement attribution marts (`models/marts/attribution/`): first-touch, last-touch, linear, time-decay, and a summary comparison mart.
+3. Add `macros/time_decay_weight.sql` to centralize decay logic and make models DRY.
+4. (Optional) Build `int_user_sessions` if session-level (rather than journey-level) grouping is needed.
 5. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
 
 ---
@@ -111,4 +106,4 @@ MIT — see LICENSE in the repo root.
 ---
 
 Authorship
-Project authored by Nikash Umesh. See `build_source_data.py` and `generate_synthetic_data.py` for generation details and authorship notes.
+Project authored by Nikash Umesh. See `build_source_data.py` (current) and `generate_synthetic_data(deprecated).py` (earlier version) for generation details and authorship notes.
