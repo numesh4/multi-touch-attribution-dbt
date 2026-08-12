@@ -1,6 +1,6 @@
 # multi-touch-attribution-dbt
 
-A hands-on dbt project for multi-touch attribution (first-touch, last-touch, linear, and time-decay) using synthetic marketing data. Designed as a portfolio/project scaffold: generate or load sample data, run dbt models, and compare attribution methodologies alongside an incrementality check.
+A dbt project for multi-touch attribution (first-touch, last-touch, linear, and time-decay) using synthetic marketing data. Designed as a portfolio/project scaffold: generate or load sample data, run dbt models, and compare attribution methodologies alongside an incrementality check.
 
 ---
 
