@@ -2,6 +2,7 @@ target/
 dbt_packages/
 logs/
 dev.duckdb
+dev_alt.duckdb
 .env
 venv/
 dbt_internal_packages/
