@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_costs
+    description: |
+      Unified staging model for daily ad spend. Normalizes raw Google Ads and Meta Ads cost
+      feeds into a canonical channel/date grain, converting Google Ads' cost-in-micros into
+      standard currency to match Meta's spend units.
+    columns:
+      - name: cost_date
+        description: "Calendar date the spend was reported for."
+        tests:
+          - not_null
+      - name: channel
+        description: "Canonical channel category (paid_search, paid_social)."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["paid_search", "paid_social"]
+      - name: campaign
+        description: "Campaign or campaign-group label where the source provides one (Meta only; Google Ads costs are channel-level, so null here)."
+      - name: cost
+        description: "Daily spend converted to standard currency units (Google Ads' cost_micros_equivalent divided by 1,000,000)."
+        tests:
+          - not_null
+      - name: impressions
+        description: "Daily impressions where the source provides them (Meta only; null for Google Ads)."
+      - name: clicks
+        description: "Daily clicks where the source provides them (Meta only; null for Google Ads)."
+      - name: raw_source
+        description: "Source table this row originated from."
