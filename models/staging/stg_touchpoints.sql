@@ -27,15 +27,15 @@ meta_pixel as (
         -- attempt to resolve known customer via customer_profile source mapping
         (select known_customer_id from {{ ref('stg_customers_unification') }} cu
             where cu.source_system = 'raw_meta_pixel.meta_pixel_events'
-              and cu.source_id = lower(trim(m.pixel_event_id::text))
+              and cu.source_id = lower(trim(m.fb_external_id::text))
             limit 1) as resolved_known_customer_id,
         (select customer_profile_id from {{ ref('stg_customers_unification') }} cu
             where cu.source_system = 'raw_meta_pixel.meta_pixel_events'
-              and cu.source_id = lower(trim(m.pixel_event_id::text))
+              and cu.source_id = lower(trim(m.fb_external_id::text))
             limit 1) as resolved_customer_profile_id,
         (select match_method from {{ ref('stg_customers_unification') }} cu
             where cu.source_system = 'raw_meta_pixel.meta_pixel_events'
-              and cu.source_id = lower(trim(m.pixel_event_id::text))
+              and cu.source_id = lower(trim(m.fb_external_id::text))
             limit 1) as match_method,
         'paid_social' as channel,
         campaign_name as campaign,

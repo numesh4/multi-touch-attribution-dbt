@@ -108,9 +108,9 @@ customer_profiles as (
         normalized_email,
         normalized_phone,
         customer_type,
-        source_timestamp,
         source_system,
         source_id,
+        source_timestamp,
         match_method,
         is_known_customer,
         merge_reason
@@ -122,9 +122,9 @@ customer_profiles as (
         normalized_email,
         normalized_phone,
         customer_type,
-        source_timestamp,
         source_system,
         source_id,
+        source_timestamp,
         match_method,
         is_known_customer,
         merge_reason
@@ -136,9 +136,9 @@ customer_profiles as (
         normalized_email,
         normalized_phone,
         customer_type,
-        source_timestamp,
         source_system,
         source_id,
+        source_timestamp,
         match_method,
         is_known_customer,
         merge_reason
@@ -150,9 +150,9 @@ customer_profiles as (
         normalized_email,
         normalized_phone,
         customer_type,
-        source_timestamp,
         source_system,
         source_id,
+        source_timestamp,
         match_method,
         is_known_customer,
         merge_reason
