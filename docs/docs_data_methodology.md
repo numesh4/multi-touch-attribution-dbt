@@ -1,6 +1,6 @@
 # Data Methodology and Realism Notes
 
-Current project stage: staging models (`stg_touchpoints`, `stg_conversions`, `stg_customers_unification`) and the intermediate journey model (`int_user_journeys`) are built. The next phase is cost-data staging (`stg_costs`) and the attribution marts.
+Current project stage: staging models (`stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`), the intermediate journey model (`int_user_journeys`), and four attribution marts (`fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, `fct_attribution_time_decay`) are built. The next phase is `fct_attribution_summary` and the incrementality holdout model.
 
 This document explains the design decisions behind the synthetic dataset used in this project, why it was built the way it was, and the known limitations of the approach. It's intended to sit alongside the technical models as a plain-language reference, the kind of document a stakeholder or interviewer could read without needing to open any SQL.
 

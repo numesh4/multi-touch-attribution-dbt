@@ -53,7 +53,7 @@ erDiagram
     string subject_category
   }
   GOOGLE_ADS_COSTS {
-    date cost_date
+    date date
     string channel_name
     int cost_micros_equivalent
   }
@@ -68,7 +68,7 @@ erDiagram
 
 **Note on identity matching:** `GA4_EVENTS` and `META_PIXEL_EVENTS` carry a customer ID directly (`ga_user_id`, `fb_external_id`), so they resolve to `CUSTOMERS` with a clean, if loosely-typed, key match. `CALLS` and `HELPDESK_EMAILS` carry no customer ID at all, they're matched to `CUSTOMERS` by a digit-normalized phone number or a lowercased/trimmed email address instead, a genuinely weaker join than a foreign key. `stg_customers_unification` is where all four of these matching strategies actually get implemented and reconciled into one `customer_profile_id`.
 
-**Note on the cost tables:** `google_ads_costs` and `meta_ads_costs` don't share a customer or event key with anything else, they're daily aggregates. They're intended to join to touchpoints on `channel` + `date`, a many-to-many relationship, not a true foreign key, once a `stg_costs` staging model normalizes both tables into one consistent "cost" concept. That model doesn't exist yet; see the layered view below.
+**Note on the cost tables:** `google_ads_costs` and `meta_ads_costs` don't share a customer or event key with anything else, they're daily aggregates. They join to touchpoints on `channel` + `date`, a many-to-many relationship, not a true foreign key. `stg_costs` normalizes both tables into one consistent "cost" concept (including converting Google Ads' cost-in-micros to standard currency); see the layered view below.
 
 ---
 
@@ -93,7 +93,7 @@ flowchart LR
     stg_customers[stg_customers_unification]
     stg_touchpoints[stg_touchpoints]
     stg_conversions[stg_conversions]
-    stg_costs["stg_costs (planned)"]
+    stg_costs[stg_costs]
   end
 
   subgraph Intermediate["Intermediate"]
@@ -101,13 +101,13 @@ flowchart LR
     int_sessions["int_user_sessions (planned)"]
   end
 
-  subgraph Marts["Marts (planned)"]
+  subgraph Marts["Marts"]
     fct_first[fct_attribution_first_touch]
     fct_last[fct_attribution_last_touch]
     fct_linear[fct_attribution_linear]
     fct_time_decay[fct_attribution_time_decay]
-    fct_summary[fct_attribution_summary]
-    fct_incrementality[fct_incrementality_vs_attribution]
+    fct_summary["fct_attribution_summary (planned)"]
+    fct_incrementality["fct_incrementality_vs_attribution (planned)"]
   end
 
   %% Raw source tables -> stg_customers_unification (identity resolution)
@@ -129,7 +129,7 @@ flowchart LR
   raw_shopify_customers --> stg_conversions
   stg_customers --> stg_conversions
 
-  %% Raw cost tables -> stg_costs (planned)
+  %% Raw cost tables -> stg_costs
   raw_google --> stg_costs
   raw_meta_ads --> stg_costs
 
@@ -155,8 +155,8 @@ flowchart LR
 
 Notes:
 - Raw: physical tables loaded directly into DuckDB by `build_source_data.py` (standing in for Snowflake/BigQuery in production), bypassing `dbt seed` entirely, the same way an EL tool would land them. Eight tables across seven schemas: `raw_ga4.ga4events`, `raw_meta_pixel.meta_pixel_events`, `raw_callrail.calls`, `raw_helpdesk.inbound_helpdesk_emails`, `raw_shopify.customers`, `raw_shopify.shopify_orders`, `raw_google_ads.google_campaign_costs`, `raw_meta_ads.meta_ad_insights`.
-- Staging: three models are built and validated today. `stg_customers_unification` resolves the four touchpoint sources and the orders source against `raw_shopify.customers` into one `customer_profile_id` per person (see `docs/docs_data_methodology.md` for the matching logic). `stg_touchpoints` unions the four touchpoint sources into one canonical touchpoint schema, resolved against `stg_customers_unification`. `stg_conversions` normalizes `raw_shopify.shopify_orders` into a canonical conversions table, also resolved against `stg_customers_unification`. `stg_costs`, which would normalize the two cost sources (including the Google Ads micros conversion) into one canonical cost concept, is planned but not yet built.
+- Staging: four models are built and validated today. `stg_customers_unification` resolves the four touchpoint sources and the orders source against `raw_shopify.customers` into one `customer_profile_id` per person (see `docs/docs_data_methodology.md` for the matching logic). `stg_touchpoints` unions the four touchpoint sources into one canonical touchpoint schema, resolved against `stg_customers_unification`. `stg_conversions` normalizes `raw_shopify.shopify_orders` into a canonical conversions table, also resolved against `stg_customers_unification`. `stg_costs` normalizes the two cost sources, including the Google Ads micros conversion, into one canonical cost concept.
 - Intermediate: `int_user_journeys` is built, it stitches every touchpoint before an order into a converting journey, and groups touchpoints from non-converting profiles into a non-converting journey, with ordinal position, time-since-previous-touch, and first/last-touch flags computed per touch. `int_user_sessions` is planned but not yet built.
-- Marts: no attribution marts are built yet. Planned models: `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, `fct_attribution_time_decay`, `fct_attribution_summary`, and `fct_incrementality_vs_attribution`.
+- Marts: four attribution marts are built — `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, and `fct_attribution_time_decay`. `fct_attribution_summary` (unions all four) and `fct_incrementality_vs_attribution` are still planned.
 
-This layered view makes it clear where to place tests and transformations: schema and relationship tests on the staging layer today (already in place for `stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, and `int_user_journeys`), and business-rule tests on the mart layer as it gets built.
+This layered view makes it clear where to place tests and transformations: schema and relationship tests on the staging layer (already in place for `stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`, and `int_user_journeys`), and business-rule tests on the mart layer as it gets built (not-null/unique tests already in place for the four built attribution marts).

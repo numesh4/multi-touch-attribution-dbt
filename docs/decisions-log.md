@@ -1,6 +1,6 @@
 # Decisions Log & Changelog
 
-Record of the key decisions made during the build (and why), plus a running changelog of what shipped when. Referenced from the README and from `docs/docs_data_methodology.md`, which covers the dataset design in depth — this file is the shorter "what changed and why" companion.
+Record of the key decisions made during the build (and why), plus a running changelog of what shipped when. Referenced from the README and from `docs/docs_data_methodology.md`, which covers the dataset design in depth - this file is the shorter "what changed and why" companion.
 
 ---
 
@@ -43,3 +43,7 @@ An untracked-in-plan DuckDB file had been committed to git and wasn't covered by
 | 2026-08-12 | Added `is_repeat_purchase` flag to `stg_conversions` |
 | 2026-08-12 | Synced methodology, ERD, and README with current source schema and model state |
 | 2026-08-14 | Repo cleanup: removed stray `dev_alt.duckdb`, added MIT `LICENSE`, added this decisions log |
+| 2026-08-16 | `stg_costs` and `fct_attribution_first_touch` built |
+| 2026-08-17 | `fct_attribution_last_touch` built |
+| 2026-08-17 | Fixed a `UNION ALL` column-order bug in `stg_customers_unification` and a wrong join key in `stg_touchpoints`' meta_pixel resolution — together these had zeroed out attribution for `paid_search`, `paid_social`, `organic`, and `email` |
+| 2026-08-17 | `fct_attribution_linear` and `fct_attribution_time_decay` built |

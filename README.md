@@ -18,9 +18,10 @@ Build and compare multiple multi-touch attribution methods with synthetic data a
 ---
 
 ## Current project stage
-- Staging models `stg_customers_unification`, `stg_touchpoints`, and `stg_conversions` are built and validated.
+- Staging models `stg_customers_unification`, `stg_touchpoints`, `stg_conversions`, and `stg_costs` are built and validated.
 - The intermediate journey model `int_user_journeys` (stitching touchpoints to conversions) is built.
-- The next phase is cost-data staging (`stg_costs`) and the attribution marts.
+- Four attribution marts are built: `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, and `fct_attribution_time_decay`.
+- The next phase is `fct_attribution_summary` (unioning the four marts above) and the incrementality holdout model.
 
 ---
 
@@ -76,10 +77,9 @@ See [dbt_project.yml](dbt_project.yml) for materialization defaults.
 ---
 
 ## Recommended next steps (prioritized)
-1. Add staging normalization for cost data:
-   - `models/staging/stg_costs.sql` to normalize Google Ads / Meta Ads spend and convert units to standard currency.
-2. Implement attribution marts (`models/marts/attribution/`): first-touch, last-touch, linear, time-decay, and a summary comparison mart.
-3. Add `macros/time_decay_weight.sql` to centralize decay logic and make models DRY.
+1. Add `fct_attribution_summary` (`models/marts/attribution/`): union the four built attribution marts (first-touch, last-touch, linear, time-decay) into one comparison mart.
+2. Build the incrementality holdout model (`fct_incrementality_vs_attribution`).
+3. (Optional) Extract `macros/time_decay_weight.sql` if decay-weight logic ends up needed in more than one model — currently only `fct_attribution_time_decay` uses it, so it's inline.
 4. (Optional) Build `int_user_sessions` if session-level (rather than journey-level) grouping is needed.
 5. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
 
