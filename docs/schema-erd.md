@@ -98,15 +98,13 @@ flowchart LR
 
   subgraph Intermediate["Intermediate"]
     int_journeys[int_user_journeys]
+    int_credit[int_attribution_credit]
     int_sessions["int_user_sessions (planned)"]
   end
 
   subgraph Marts["Marts"]
-    fct_first[fct_attribution_first_touch]
-    fct_last[fct_attribution_last_touch]
-    fct_linear[fct_attribution_linear]
-    fct_time_decay[fct_attribution_time_decay]
-    fct_summary["fct_attribution_summary (planned)"]
+    fct_summary[fct_attribution_summary]
+    fct_detail[fct_attribution_detail]
     fct_incrementality["fct_incrementality_vs_attribution (planned)"]
   end
 
@@ -140,23 +138,16 @@ flowchart LR
   stg_touchpoints --> int_sessions
 
   %% Intermediate + costs -> marts
-  int_journeys --> fct_first
-  int_journeys --> fct_last
-  int_journeys --> fct_linear
-  int_journeys --> fct_time_decay
+  int_journeys --> int_credit
   int_journeys --> fct_incrementality
-  stg_costs --> fct_summary
-
-  fct_first --> fct_summary
-  fct_last --> fct_summary
-  fct_linear --> fct_summary
-  fct_time_decay --> fct_summary
+  int_credit --> fct_summary
+  int_credit --> fct_detail
 ```
 
 Notes:
 - Raw: physical tables loaded directly into DuckDB by `build_source_data.py` (standing in for Snowflake/BigQuery in production), bypassing `dbt seed` entirely, the same way an EL tool would land them. Eight tables across seven schemas: `raw_ga4.ga4events`, `raw_meta_pixel.meta_pixel_events`, `raw_callrail.calls`, `raw_helpdesk.inbound_helpdesk_emails`, `raw_shopify.customers`, `raw_shopify.shopify_orders`, `raw_google_ads.google_campaign_costs`, `raw_meta_ads.meta_ad_insights`.
 - Staging: four models are built and validated today. `stg_customers_unification` resolves the four touchpoint sources and the orders source against `raw_shopify.customers` into one `customer_profile_id` per person (see `docs/docs_data_methodology.md` for the matching logic). `stg_touchpoints` unions the four touchpoint sources into one canonical touchpoint schema, resolved against `stg_customers_unification`. `stg_conversions` normalizes `raw_shopify.shopify_orders` into a canonical conversions table, also resolved against `stg_customers_unification`. `stg_costs` normalizes the two cost sources, including the Google Ads micros conversion, into one canonical cost concept.
-- Intermediate: `int_user_journeys` is built, it stitches every touchpoint before an order into a converting journey, and groups touchpoints from non-converting profiles into a non-converting journey, with ordinal position, time-since-previous-touch, and first/last-touch flags computed per touch. `int_user_sessions` is planned but not yet built.
-- Marts: four attribution marts are built — `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, and `fct_attribution_time_decay`. `fct_attribution_summary` (unions all four) and `fct_incrementality_vs_attribution` are still planned.
+- Intermediate: `int_user_journeys` is built, it stitches every touchpoint before an order into a converting journey, and groups touchpoints from non-converting profiles into a non-converting journey, with ordinal position, time-since-previous-touch, and first/last-touch flags computed per touch. `int_attribution_credit` is also built — it computes per-touchpoint credit for all four attribution methods (first-touch, last-touch, linear, time-decay) in one place, materialized as a table since it's read by both marts below. `int_user_sessions` is planned but not yet built.
+- Marts: `fct_attribution_summary` (channel x method rollup, one row per channel per method) and `fct_attribution_detail` (full touchpoint/customer/journey grain) are both built, aggregated/passed through from `int_attribution_credit`. `fct_incrementality_vs_attribution` is still planned.
 
-This layered view makes it clear where to place tests and transformations: schema and relationship tests on the staging layer (already in place for `stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`, and `int_user_journeys`), and business-rule tests on the mart layer as it gets built (not-null/unique tests already in place for the four built attribution marts).
+This layered view makes it clear where to place tests and transformations: schema and relationship tests on the staging layer (already in place for `stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`, and `int_user_journeys`), and business-rule tests on the mart layer as it gets built (not-null/unique tests already in place for `int_attribution_credit`, `fct_attribution_summary`, and `fct_attribution_detail`).

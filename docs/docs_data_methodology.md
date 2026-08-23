@@ -1,8 +1,8 @@
 # Data Methodology and Realism Notes
 
-Current project stage: staging models (`stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`), the intermediate journey model (`int_user_journeys`), and four attribution marts (`fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, `fct_attribution_time_decay`) are built. The next phase is `fct_attribution_summary` and the incrementality holdout model.
+Current project stage: staging models (`stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`), the intermediate journey model (`int_user_journeys`), and the attribution layer (`int_attribution_credit` computing per-touchpoint credit for all four methods, rolled up into `fct_attribution_summary` and exposed at full grain in `fct_attribution_detail`) are built. The next phase is the incrementality holdout model.
 
-This document explains the design decisions behind the synthetic dataset used in this project, why it was built the way it was, and the known limitations of the approach. It's intended to sit alongside the technical models as a plain-language reference, the kind of document a stakeholder or interviewer could read without needing to open any SQL.
+This document explains the design decisions behind the synthetic dataset used in this project, why it was built the way it was, and the known limitations of the approach. It's intended to sit alongside the technical models as a plain-language reference, the kind of document anyone could read without needing to open any SQL.
 
 ---
 
@@ -29,7 +29,7 @@ Each source uses its own realistic column naming (`ga_user_id` vs. `fb_external_
 
 Every synthetic customer is randomly assigned a segment, weighted 85% `b2c` / 15% `b2b`, and that segment shapes the rest of their journey rather than just sitting as a label:
 
-- **Channel mix** differs by segment. B2C customers are weighted toward `paid_search` and `paid_social`; B2B customers are weighted toward `phone` and `email_inbound` (sales calls, inquiries) and away from `paid_social`.
+- **Channel mix** differs by segment. B2C customers are weighted toward `paid_search` and `paid_social`; B2B customers are weighted toward `phone` and `email_inbound` (sales calls, inquiries) and away from `paid_social`. A pure scenario based decision, can be amended as needed to swap behaviour. 
 - **Journey scenario mix** differs by segment. B2B customers are far less likely to be single-touch converters (10% vs. 35% for B2C) and far more likely to have a long-gap, multi-week sales cycle (20% vs. 2% for B2C). See the journey scenarios table below.
 - **Revenue** differs by segment: B2C orders range $35–$420, B2B orders range $800–$6,000, reflecting a self-serve checkout vs. a sales-assisted purchase.
 

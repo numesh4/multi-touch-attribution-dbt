@@ -20,8 +20,8 @@ Build and compare multiple multi-touch attribution methods with synthetic data a
 ## Current project stage
 - Staging models `stg_customers_unification`, `stg_touchpoints`, `stg_conversions`, and `stg_costs` are built and validated.
 - The intermediate journey model `int_user_journeys` (stitching touchpoints to conversions) is built.
-- Four attribution marts are built: `fct_attribution_first_touch`, `fct_attribution_last_touch`, `fct_attribution_linear`, and `fct_attribution_time_decay`.
-- The next phase is `fct_attribution_summary` (unioning the four marts above) and the incrementality holdout model.
+- `int_attribution_credit` computes per-touchpoint credit for all four attribution methods (first-touch, last-touch, linear, time-decay) in one place. `fct_attribution_summary` (channel x method rollup) and `fct_attribution_detail` (touchpoint/customer/journey-level detail) both read from it.
+- The next phase is the incrementality holdout model.
 
 ---
 
@@ -77,11 +77,10 @@ See [dbt_project.yml](dbt_project.yml) for materialization defaults.
 ---
 
 ## Recommended next steps (prioritized)
-1. Add `fct_attribution_summary` (`models/marts/attribution/`): union the four built attribution marts (first-touch, last-touch, linear, time-decay) into one comparison mart.
-2. Build the incrementality holdout model (`fct_incrementality_vs_attribution`).
-3. (Optional) Extract `macros/time_decay_weight.sql` if decay-weight logic ends up needed in more than one model — currently only `fct_attribution_time_decay` uses it, so it's inline.
-4. (Optional) Build `int_user_sessions` if session-level (rather than journey-level) grouping is needed.
-5. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
+1. Build the incrementality holdout model (`fct_incrementality_vs_attribution`).
+2. (Optional) Extract `macros/time_decay_weight.sql` — the time-decay weighting math now lives inline in `int_attribution_credit` alongside the other three methods' weight logic.
+3. (Optional) Build `int_user_sessions` if session-level (rather than journey-level) grouping is needed.
+4. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
 
 ---
 
