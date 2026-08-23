@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: int_attribution_credit
+    description: |
+      Per-touchpoint credit for every attribution method. Grain is one row per
+      (journey_id, platform_id, attribution_method) -- every touchpoint in a
+      converting journey appears once per method, with that method's
+      credit_weight and attributed_revenue. Shared source for all four
+      fct_attribution_* channel marts, fct_attribution_summary, and
+      fct_attribution_detail, so each method's weighting logic exists in one
+      place instead of being duplicated per mart.
+    data_tests:
+      - unique:
+          column_name: "journey_id || '::' || platform_id || '::' || attribution_method"
+
+    columns:
+      - name: journey_id
+        description: Order_id for the converting journey this touchpoint belongs to.
+        data_tests:
+          - not_null
+
+      - name: platform_id
+        description: Unique touchpoint identifier within source system.
+        data_tests:
+          - not_null
+
+      - name: shopify_customer_id
+        description: Shopify customer_id for the order this journey represents.
+
+      - name: resolved_known_customer_id
+        description: Shopify customer_id if this specific touchpoint resolved to a known customer. Null if unknown.
+
+      - name: resolved_customer_profile_id
+        description: Unified customer profile ID (from stg_customers_unification).
+        data_tests:
+          - not_null
+
+      - name: customer_type
+        description: B2B or B2C. Null for unknown visitors.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['b2b', 'b2c']
+
+      - name: channel
+        description: Marketing channel (paid_search, paid_social, organic, email, phone, email_inbound).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['paid_search', 'paid_social', 'organic', 'email', 'phone', 'email_inbound']
+
+      - name: campaign
+        description: Campaign name or identifier within the channel.
+
+      - name: event_timestamp
+        description: When the touchpoint occurred.
+        data_tests:
+          - not_null
+
+      - name: touchpoint_sequence
+        description: Ordinal position in journey (1 = first touch, 2 = second, etc.).
+        data_tests:
+          - not_null
+
+      - name: total_touches_in_journey
+        description: Total touchpoints in this journey.
+        data_tests:
+          - not_null
+
+      - name: days_to_conversion
+        description: Days from this touch to journey end. 0 if touch on order date.
+        data_tests:
+          - not_null
+
+      - name: order_value
+        description: Order revenue for the journey this touchpoint belongs to.
+        data_tests:
+          - not_null
+
+      - name: attribution_method
+        description: One of first_touch, last_touch, linear, time_decay.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['first_touch', 'last_touch', 'linear', 'time_decay']
+
+      - name: credit_weight
+        description: |
+          This touchpoint's fractional credit for the conversion under this
+          method. 0 or 1 for first_touch/last_touch, 1/total_touches_in_journey
+          for linear, normalized exponential decay for time_decay. Always sums
+          to 1 within a (journey_id, attribution_method) pair.
+        data_tests:
+          - not_null
+
+      - name: attributed_revenue
+        description: order_value * credit_weight -- this touchpoint's fractional share of the journey's revenue under this method.
+        data_tests:
+          - not_null

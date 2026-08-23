@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: fct_attribution_summary
+    description: |
+      All four attribution methods side by side, one row per (channel,
+      attribution_method). Aggregated directly from int_attribution_credit.
+      Intended for BI tools to filter/parameter-select a single
+      attribution_method for a coherent single-method view, or to leave
+      unfiltered to compare methods side by side. Do not sum
+      attributed_revenue across the whole table -- that mixes four separate
+      accountings of the same revenue. See docs/docs_data_methodology.md.
+    data_tests:
+      - unique:
+          column_name: "channel || '::' || attribution_method"
+
+    columns:
+      - name: channel
+        description: "Canonical touchpoint channel (paid_search, paid_social, email, organic, phone, email_inbound)."
+        data_tests:
+          - not_null
+
+      - name: attribution_method
+        description: "One of first_touch, last_touch, linear, time_decay -- filter to one value for a single coherent attribution view."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['first_touch', 'last_touch', 'linear', 'time_decay']
+
+      - name: attributed_conversions
+        description: "Conversions credited to this channel under this attribution method."
+        data_tests:
+          - not_null
+
+      - name: attributed_revenue
+        description: "Revenue credited to this channel under this attribution method. Not additive across attribution_method values."
+        data_tests:
+          - not_null
