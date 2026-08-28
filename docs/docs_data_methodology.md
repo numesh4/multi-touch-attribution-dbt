@@ -1,6 +1,6 @@
 # Data Methodology and Realism Notes
 
-Current project stage: staging models (`stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`), the intermediate journey model (`int_user_journeys`), and the attribution layer (`int_attribution_credit` computing per-touchpoint credit for all four methods, rolled up into `fct_attribution_summary` and exposed at full grain in `fct_attribution_detail`) are built. The next phase is the incrementality holdout model.
+Current project stage: staging models (`stg_touchpoints`, `stg_conversions`, `stg_customers_unification`, `stg_costs`), the intermediate journey model (`int_user_journeys`), the attribution layer (`int_attribution_credit` computing per-touchpoint credit for all four methods, rolled up into `fct_attribution_summary` and exposed at full grain in `fct_attribution_detail`), and the incrementality holdout (`int_holdout_conversion_rates`, `fct_incrementality_vs_attribution`) are built. See the Incrementality holdout design section below. The next phase is polishing this into the project's case-study artifact.
 
 This document explains the design decisions behind the synthetic dataset used in this project, why it was built the way it was, and the known limitations of the approach. It's intended to sit alongside the technical models as a plain-language reference, the kind of document anyone could read without needing to open any SQL.
 
@@ -141,6 +141,25 @@ This is real identity resolution, but still a deliberate simplification of a pro
 - **No backfill of historical unmatched touches once a match happens later.** If a touchpoint precedes the customer being identifiable at all (the real-world GA4 anonymous-cookie-until-login problem), it stays `unknown` rather than being retroactively linked.
 
 If a meaningful share of touchpoints resolve to `unknown` in a real deployment, that gap needs to be quantified and disclosed alongside the attribution results, not hidden by the model.
+
+---
+
+## Incrementality holdout design
+
+`build_source_data.py` randomly assigns every synthetic customer to `holdout_group`: `treatment` (85%) or `control` (15%), seeded for reproducibility. Control customers never receive `paid_search` or `paid_social` touchpoints — they can still convert via `organic`, `email`, `phone`, or `email_inbound`. The assignment is surfaced on `raw_shopify.customers` and carried through `stg_customers_unification.holdout_group`.
+
+`int_holdout_conversion_rates` rolls this up to one row per group (conversion rate, revenue per customer). `fct_incrementality_vs_attribution` compares two numbers for paid channels:
+
+- **Holdout-implied incremental value** — `(treatment_conversion_rate - control_conversion_rate) * treatment_customers`, and the equivalent for revenue. This is what the randomized split implies paid exposure actually caused.
+- **Last-touch attributed value** — what `fct_attribution_summary` credits to `paid_search` + `paid_social` under last-touch attribution.
+
+The gap between the two (`conversions_gap`, `revenue_gap`, and their `_pct` forms) is the project's central incrementality finding: attribution methods have no way to know what would have happened without the touchpoint, so they tend to over-credit channels for conversions that a randomized holdout suggests would have happened anyway.
+
+**Limitations worth naming explicitly:**
+
+- **One holdout split for the whole build period**, not a rolling or repeated experiment. A real incrementality program re-runs holdouts periodically, since channel effectiveness drifts over time.
+- **All-or-nothing suppression.** Control customers get zero paid exposure rather than a reduced dose, which is a cleaner signal than most real holdout tests can achieve (ad platforms rarely allow a true 100% suppression at the individual level) but is less realistic than a partial-suppression design.
+- **No interaction effects modeled.** Suppressing paid exposure doesn't change a control customer's organic/email/phone behavior in this simulation, whereas in reality, removing paid touches can shift some of that demand into other channels (or lose it entirely) — the two are treated as fully independent here.
 
 ---
 

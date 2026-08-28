@@ -21,7 +21,8 @@ Build and compare multiple multi-touch attribution methods with synthetic data a
 - Staging models `stg_customers_unification`, `stg_touchpoints`, `stg_conversions`, and `stg_costs` are built and validated.
 - The intermediate journey model `int_user_journeys` (stitching touchpoints to conversions) is built.
 - `int_attribution_credit` computes per-touchpoint credit for all four attribution methods (first-touch, last-touch, linear, time-decay) in one place. `fct_attribution_summary` (channel x method rollup) and `fct_attribution_detail` (touchpoint/customer/journey-level detail) both read from it.
-- The next phase is the incrementality holdout model.
+- Incrementality holdout is built: `build_source_data.py` randomly splits customers into `treatment`/`control` groups (control never receives `paid_search`/`paid_social` touchpoints), surfaced as `holdout_group` on `stg_customers_unification`. `int_holdout_conversion_rates` rolls this up to conversion rate and revenue per group, and `fct_incrementality_vs_attribution` compares the holdout-implied incremental lift against what last-touch attribution credits to paid channels.
+- The next phase is polishing this into the project's case-study artifact (see `docs/docs_data_methodology.md` for recommended next steps).
 
 ---
 
@@ -77,7 +78,7 @@ See [dbt_project.yml](dbt_project.yml) for materialization defaults.
 ---
 
 ## Recommended next steps (prioritized)
-1. Build the incrementality holdout model (`fct_incrementality_vs_attribution`).
+1. Polish the incrementality holdout model (`fct_incrementality_vs_attribution`, built) into the project's case-study artifact — plain-language writeup of the holdout design and the attribution-vs-holdout gap finding.
 2. (Optional) Extract `macros/time_decay_weight.sql` — the time-decay weighting math now lives inline in `int_attribution_credit` alongside the other three methods' weight logic.
 3. (Optional) Build `int_user_sessions` if session-level (rather than journey-level) grouping is needed.
 4. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
