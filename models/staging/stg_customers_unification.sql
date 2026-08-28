@@ -202,7 +202,16 @@ from (
     select *,
            row_number() over (
                partition by customer_profile_id
-               order by is_known_customer desc, source_timestamp asc
+               -- source_system is a final deterministic tiebreaker: without
+               -- it, a tie on is_known_customer + source_timestamp between
+               -- two branches for the same profile has no defined winner,
+               -- and was observed to pick differently across separate dbt
+               -- build runs against the same static data (surfaced as a
+               -- handful of NULL resolved_customer_profile_id rows in
+               -- int_attribution_credit that came and went between builds).
+               -- (customer_profile_id, source_system) is unique per branch's
+               -- own group by, so this always fully resolves the tie.
+               order by is_known_customer desc, source_timestamp asc, source_system asc
            ) as rn
     from customer_profiles_filled
 )

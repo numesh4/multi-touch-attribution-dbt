@@ -59,9 +59,14 @@ converting_journeys as (
 ),
 
 -- identify all profiles that have at least one converting order
+-- (must exclude nulls: a handful of converting touchpoints resolve
+-- resolved_known_customer_id but not resolved_customer_profile_id, and a
+-- NULL in this list would make the "not in" filter below evaluate to
+-- unknown for every row, silently dropping all non-converting journeys)
 converted_profiles as (
     select distinct resolved_customer_profile_id
     from converting_journeys
+    where resolved_customer_profile_id is not null
 ),
 
 -- non-converting journeys: all touches from profiles with no orders/purchases
