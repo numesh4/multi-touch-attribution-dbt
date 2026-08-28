@@ -9,6 +9,7 @@ A dbt project for multi-touch attribution (first-touch, last-touch, linear, and 
 - Sources YAML: [models/staging/_staging__sources.yml](models/staging/_staging__sources.yml)
 - Data generator: [build_source_data.py](build_source_data.py) (the older `generate_synthetic_data.py` is deprecated, kept as `generate_synthetic_data(deprecated).py`)
 - Docs: [docs/docs_data_methodology.md](docs/docs_data_methodology.md)
+- Case study: [docs/case-study.md](docs/case-study.md)
 
 ---
 
@@ -78,7 +79,7 @@ See [dbt_project.yml](dbt_project.yml) for materialization defaults.
 ---
 
 ## Recommended next steps (prioritized)
-1. Polish the incrementality holdout model (`fct_incrementality_vs_attribution`, built) into the project's case-study artifact — plain-language writeup of the holdout design and the attribution-vs-holdout gap finding.
+1. `docs/case-study.md` is drafted. Remaining Week 4 polish (per the training plan): a Tableau/ThoughtSpot dashboard, a Loom walkthrough, STAR-style interview talking points, resume/LinkedIn update — none of which are code changes.
 2. (Optional) Extract `macros/time_decay_weight.sql` — the time-decay weighting math now lives inline in `int_attribution_credit` alongside the other three methods' weight logic.
 3. (Optional) Build `int_user_sessions` if session-level (rather than journey-level) grouping is needed.
 4. (Optional) Add CI: GitHub Actions to run `dbt seed/run/test` on PRs and protect `main` branch.
