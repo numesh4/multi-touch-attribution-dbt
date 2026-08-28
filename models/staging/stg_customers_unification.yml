@@ -21,6 +21,8 @@ models:
         description: "Normalized phone number used for identity matching where available."
       - name: customer_type
         description: "Customer type from Shopify when available (b2c/b2b)."
+      - name: holdout_group
+        description: "Incrementality holdout assignment from Shopify when available ('treatment' or 'control'). Control customers never receive paid_search/paid_social touchpoints, so the treatment-vs-control conversion-rate gap can be compared against what attribution credits paid channels."
       - name: source_system
         description: "The raw source system that supplied this identity row."
         tests:

@@ -32,6 +32,13 @@ Schemas / tables:
     raw_meta_ads.ad_insights         <- Meta Ads API export       (paid_social costs)
 
 Six channels now: paid_search, paid_social, email, organic, phone, email_inbound.
+
+Each customer is also randomly assigned a holdout_group ("treatment" or
+"control", 85/15 split) on raw_shopify.customers, simulating a marketing
+holdout for the incrementality model: control customers never receive
+paid_search or paid_social touchpoints (they can still convert via organic/
+email/phone/email_inbound), so the treatment-vs-control conversion-rate gap
+can be compared against what attribution credits paid channels.
 Each channel's touchpoints land in a DIFFERENT raw table, matching how these
 systems actually work in production, none of them share a schema, and two
 of them (calls, inbound emails) don't even share a clean user_id, they're
@@ -73,6 +80,12 @@ END_DATE = datetime(2026, 6, 30)
 
 CUSTOMER_TYPE_WEIGHTS = {"b2c": 0.85, "b2b": 0.15}
 
+# Incrementality holdout: control-group customers never receive paid_search
+# or paid_social touchpoints (organic/email/phone/email_inbound still allowed
+# and they can still convert) so a control-vs-treatment conversion-rate gap
+# can be compared against what attribution credits paid channels.
+HOLDOUT_GROUP_WEIGHTS = {"treatment": 0.85, "control": 0.15}
+
 SCENARIO_WEIGHTS_B2C = {
     "single_touch": 0.35,
     "multi_touch": 0.35,
@@ -98,6 +111,17 @@ CHANNEL_WEIGHTS_B2B = {
     "paid_search": 0.32, "paid_social": 0.06, "email": 0.20,
     "organic": 0.17, "phone": 0.15, "email_inbound": 0.10,
 }
+
+def _strip_paid_channels(weights):
+    """Renormalized copy of a channel-weight dict with paid_search/paid_social removed."""
+    filtered = {k: v for k, v in weights.items() if k not in ("paid_search", "paid_social")}
+    total = sum(filtered.values())
+    return {k: v / total for k, v in filtered.items()}
+
+
+# Used for the incrementality holdout's control group, which gets no paid exposure.
+CHANNEL_WEIGHTS_B2C_CONTROL = _strip_paid_channels(CHANNEL_WEIGHTS_B2C)
+CHANNEL_WEIGHTS_B2B_CONTROL = _strip_paid_channels(CHANNEL_WEIGHTS_B2B)
 
 CAMPAIGNS_BY_CHANNEL = {
     "paid_search": ["brand_search", "generic_search", "competitor_search"],
@@ -126,8 +150,11 @@ def random_date(start, end):
     return start + timedelta(days=random.randint(0, delta_days), seconds=random.randint(0, 86399))
 
 
-def weighted_channel_choice(customer_type):
-    weights = CHANNEL_WEIGHTS_B2B if customer_type == "b2b" else CHANNEL_WEIGHTS_B2C
+def weighted_channel_choice(customer_type, holdout_group="treatment"):
+    if holdout_group == "control":
+        weights = CHANNEL_WEIGHTS_B2B_CONTROL if customer_type == "b2b" else CHANNEL_WEIGHTS_B2C_CONTROL
+    else:
+        weights = CHANNEL_WEIGHTS_B2B if customer_type == "b2b" else CHANNEL_WEIGHTS_B2C
     channels, w = zip(*weights.items())
     return random.choices(channels, weights=w)[0]
 
@@ -141,6 +168,11 @@ def assign_scenario(customer_type):
 def assign_customer_type():
     types, w = zip(*CUSTOMER_TYPE_WEIGHTS.items())
     return random.choices(types, weights=w)[0]
+
+
+def assign_holdout_group():
+    groups, w = zip(*HOLDOUT_GROUP_WEIGHTS.items())
+    return random.choices(groups, weights=w)[0]
 
 
 def revenue_for(customer_type):
@@ -202,15 +234,16 @@ conversion_id_counter = 1
 for user_num in range(1, N_USERS + 1):
     user_id = f"user_{user_num:05d}"
     customer_type = assign_customer_type()
+    holdout_group = assign_holdout_group()
     phone = fake_phone(user_num)
     email = fake_email(user_num, customer_type)
-    customers.append((user_id, customer_type, random_date(START_DATE, END_DATE).date(), phone, email))
+    customers.append((user_id, customer_type, random_date(START_DATE, END_DATE).date(), phone, email, holdout_group))
 
     scenario = assign_scenario(customer_type)
 
     if scenario == "single_touch":
         touch_date = random_date(START_DATE, END_DATE - timedelta(days=2))
-        channel = weighted_channel_choice(customer_type)
+        channel = weighted_channel_choice(customer_type, holdout_group)
         campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
         record_touchpoint(channel, campaign, touch_date, user_id, phone, email)
         convert_date = touch_date + timedelta(hours=random.randint(1, 48))
@@ -224,7 +257,7 @@ for user_num in range(1, N_USERS + 1):
         touch_dates = sorted(journey_start + timedelta(days=random.uniform(0, window_days))
                               for _ in range(n_touches))
         for td in touch_dates:
-            channel = weighted_channel_choice(customer_type)
+            channel = weighted_channel_choice(customer_type, holdout_group)
             campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
             record_touchpoint(channel, campaign, td, user_id, phone, email)
         convert_date = touch_dates[-1] + timedelta(hours=random.randint(1, 72))
@@ -235,7 +268,7 @@ for user_num in range(1, N_USERS + 1):
         n_touches = random.randint(1, 4) # number of touches without conversion
         for _ in range(n_touches):
             td = random_date(START_DATE, END_DATE)
-            channel = weighted_channel_choice(customer_type)
+            channel = weighted_channel_choice(customer_type, holdout_group)
             campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
             record_touchpoint(channel, campaign, td, user_id, phone, email)
 
@@ -246,7 +279,7 @@ for user_num in range(1, N_USERS + 1):
         touch_dates = sorted(journey_start + timedelta(days=random.uniform(0, window_days))
                               for _ in range(n_touches))
         for td in touch_dates:
-            channel = weighted_channel_choice(customer_type)
+            channel = weighted_channel_choice(customer_type, holdout_group)
             campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
             record_touchpoint(channel, campaign, td, user_id, phone, email)
         first_convert = touch_dates[-1] + timedelta(hours=random.randint(1, 72))
@@ -259,7 +292,7 @@ for user_num in range(1, N_USERS + 1):
             if last_date + gap >= END_DATE:
                 break
             re_touch_date = last_date + gap - timedelta(days=random.randint(0, 2))
-            channel = weighted_channel_choice(customer_type)
+            channel = weighted_channel_choice(customer_type, holdout_group)
             campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
             record_touchpoint(channel, campaign, re_touch_date, user_id, phone, email)
             repeat_convert_date = last_date + gap
@@ -274,7 +307,7 @@ for user_num in range(1, N_USERS + 1):
         touch_dates = sorted(journey_start + timedelta(days=random.uniform(0, window_days))
                               for _ in range(n_touches))
         for td in touch_dates:
-            channel = weighted_channel_choice(customer_type)
+            channel = weighted_channel_choice(customer_type, holdout_group)
             campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
             record_touchpoint(channel, campaign, td, user_id, phone, email)
         convert_date = touch_dates[-1] + timedelta(hours=random.randint(1, 48))
@@ -283,14 +316,15 @@ for user_num in range(1, N_USERS + 1):
 
 # same-day rapid touches overlay (web channels only, calls/inbound email
 # don't realistically happen back-to-back the same way clicks do)
-customer_lookup = {c[0]: c for c in customers}  # user_id -> (id, type, seen, phone, email)
+customer_lookup = {c[0]: c for c in customers}  # user_id -> (id, type, seen, phone, email, holdout_group)
 web_user_ids = list({e[1] for e in ga4_events} | {e[1] for e in meta_pixel_events})
 rapid_sample = random.sample(web_user_ids, k=int(len(web_user_ids) * 0.05)) if web_user_ids else []
 for uid in rapid_sample:
-    _, ctype, _, phone, email = customer_lookup[uid]
+    _, ctype, _, phone, email, holdout_group = customer_lookup[uid]
     base_date = random_date(START_DATE, END_DATE - timedelta(days=1))
+    rapid_channels = ["email", "organic"] if holdout_group == "control" else ["paid_search", "paid_social", "email", "organic"]
     for _ in range(random.randint(2, 4)):
-        channel = random.choice(["paid_search", "paid_social", "email", "organic"])
+        channel = random.choice(rapid_channels)
         campaign = random.choice(CAMPAIGNS_BY_CHANNEL[channel])
         same_day_time = base_date + timedelta(minutes=random.randint(0, 600))
         record_touchpoint(channel, campaign, same_day_time, uid, phone, email)
@@ -346,7 +380,7 @@ df_orders = pd.DataFrame(conversions, columns=[
 ])
 
 df_customers = pd.DataFrame(customers, columns=[
-    "customer_id", "customer_type", "first_seen_date", "phone_number", "email"
+    "customer_id", "customer_type", "first_seen_date", "phone_number", "email", "holdout_group"
 ])
 
 df_google_costs = pd.DataFrame(google_ads_costs, columns=[
@@ -381,6 +415,8 @@ con.close()
 
 n_b2b = sum(1 for c in customers if c[1] == "b2b")
 n_b2c = sum(1 for c in customers if c[1] == "b2c")
+n_treatment = sum(1 for c in customers if c[5] == "treatment")
+n_control = sum(1 for c in customers if c[5] == "control")
 total_touchpoints = len(ga4_events) + len(meta_pixel_events) + len(callrail_calls) + len(helpdesk_emails)
 
 print(f"Synthetic data generated by {__author__} ({__github__})")
@@ -399,6 +435,7 @@ print()
 print("  Conversion / customer sources:")
 print(f"    raw_shopify.orders             : {len(df_orders)} rows")
 print(f"    raw_shopify.customers          : {len(df_customers)} rows  (b2c: {n_b2c}, b2b: {n_b2b})")
+print(f"      holdout groups                : treatment: {n_treatment}, control: {n_control} (control gets no paid_search/paid_social touchpoints)")
 print()
 print("  Cost sources:")
 print(f"    raw_google_ads.campaign_costs  : {len(df_google_costs)} rows")

@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: fct_incrementality_vs_attribution
+    description: |
+      Single-row mart comparing last-touch attribution's credit to paid
+      channels (paid_search, paid_social) against the treatment/control
+      holdout's implied incremental effect. A positive gap means attribution
+      is crediting paid spend for conversions that the holdout suggests would
+      have happened anyway. See docs/docs_data_methodology.md for the holdout
+      design and its limitations (it's a single randomized split covering the
+      whole build period, not a rolling/repeated experiment).
+
+    columns:
+      - name: treatment_customers
+        description: Distinct customers in the treatment group.
+        data_tests:
+          - not_null
+
+      - name: control_customers
+        description: Distinct customers in the control group (never exposed to paid_search/paid_social).
+        data_tests:
+          - not_null
+
+      - name: treatment_conversion_rate
+        description: Share of treatment customers with at least one conversion.
+        data_tests:
+          - not_null
+
+      - name: control_conversion_rate
+        description: Share of control customers with at least one conversion.
+        data_tests:
+          - not_null
+
+      - name: incremental_conversion_rate
+        description: treatment_conversion_rate minus control_conversion_rate.
+        data_tests:
+          - not_null
+
+      - name: holdout_implied_incremental_conversions
+        description: incremental_conversion_rate * treatment_customers -- conversions the holdout implies paid exposure actually caused.
+        data_tests:
+          - not_null
+
+      - name: holdout_implied_incremental_revenue
+        description: (treatment revenue_per_customer - control revenue_per_customer) * treatment_customers.
+        data_tests:
+          - not_null
+
+      - name: last_touch_attributed_paid_conversions
+        description: Conversions last-touch attribution credits to paid_search + paid_social, from fct_attribution_summary.
+        data_tests:
+          - not_null
+
+      - name: last_touch_attributed_paid_revenue
+        description: Revenue last-touch attribution credits to paid_search + paid_social, from fct_attribution_summary.
+        data_tests:
+          - not_null
+
+      - name: conversions_gap
+        description: last_touch_attributed_paid_conversions minus holdout_implied_incremental_conversions. Positive means attribution over-credits paid channels relative to the holdout.
+
+      - name: conversions_gap_pct
+        description: conversions_gap as a fraction of last_touch_attributed_paid_conversions.
+
+      - name: revenue_gap
+        description: last_touch_attributed_paid_revenue minus holdout_implied_incremental_revenue.
+
+      - name: revenue_gap_pct
+        description: revenue_gap as a fraction of last_touch_attributed_paid_revenue.

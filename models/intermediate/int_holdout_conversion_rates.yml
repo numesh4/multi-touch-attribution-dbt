@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: int_holdout_conversion_rates
+    description: |
+      Customer-level conversion rate and revenue rolled up to one row per
+      holdout_group ('treatment'/'control'). Treatment customers can receive
+      any channel; control customers were never exposed to paid_search or
+      paid_social (see build_source_data.py). The gap between the two groups'
+      conversion rates is the holdout-implied incremental effect of paid
+      marketing, used by fct_incrementality_vs_attribution.
+    data_tests:
+      - unique:
+          column_name: holdout_group
+
+    columns:
+      - name: holdout_group
+        description: "'treatment' or 'control'."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['treatment', 'control']
+
+      - name: customers
+        description: Distinct known customers in this holdout group.
+        data_tests:
+          - not_null
+
+      - name: converting_customers
+        description: Customers in this group with at least one conversion.
+        data_tests:
+          - not_null
+
+      - name: conversion_rate
+        description: converting_customers / customers.
+        data_tests:
+          - not_null
+
+      - name: total_conversions
+        description: Total conversions (orders) across all customers in this group.
+        data_tests:
+          - not_null
+
+      - name: total_revenue
+        description: Total order revenue across all customers in this group.
+        data_tests:
+          - not_null
+
+      - name: revenue_per_customer
+        description: total_revenue / customers.
+        data_tests:
+          - not_null
